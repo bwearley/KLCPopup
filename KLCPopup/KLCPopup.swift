@@ -21,6 +21,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+import UIKit
+
 // KLCPopupShowType: Controls how the popup will be presented.
 enum KLCPopupShowType {
 	case None
@@ -57,7 +59,7 @@ enum KLCPopupDismissType {
 
 // KLCPopupHorizontalLayout: Controls where the popup will come to rest horizontally.
 enum KLCPopupHorizontalLayout {
-	case Custom = 0
+	case Custom
 	case Left
 	case LeftOfCenter
 	case Center
@@ -86,7 +88,7 @@ struct KLCPopupLayout {
 	var horizontal:KLCPopupHorizontalLayout
 	var vertical:KLCPopupVerticalLayout
 
-	init(horizontal:KLCPopupHorizontalLayout, _ vertical:KLCPopupVerticalLayout) {
+	init(horizontal:KLCPopupHorizontalLayout, vertical:KLCPopupVerticalLayout) {
 		self.horizontal = horizontal
 		self.vertical = vertical
 	}
@@ -94,7 +96,7 @@ struct KLCPopupLayout {
 
 let kAnimationOptionCurveIOS7 = (7 << 16)
 
-let KLCPopupLayoutCenter = [KLCPopupHorizontalLayout.Center, KLCPopupVerticalLayout.Center]
+let KLCPopupLayoutCenter = KLCPopupLayout(horizontal: .Center, vertical: .Center)
 //const KLCPopupLayout KLCPopupLayoutCenter = { KLCPopupHorizontalLayoutCenter, KLCPopupVerticalLayoutCenter }
 
 
@@ -125,16 +127,13 @@ class KLCPopup:UIView {
 
 	// Block gets called after show animation finishes. Be sure to use weak reference for popup within the block to avoid retain cycle.
 	var didFinishShowingCompletion:(Void -> Void)
-	//@property (nonatomic, copy) void (^didFinishShowingCompletion)()
 
 	// Block gets called when dismiss animation starts. Be sure to use weak reference for popup within the block to avoid retain cycle.
 	var willStartDismissingCompletion:(Void -> Void)
-	//@property (nonatomic, copy) void (^willStartDismissingCompletion)()
 
 	// Block gets called after dismiss animation finishes. Be sure to use weak reference for popup within the block to avoid retain cycle.
 	var didFinishDismissingCompletion:(Void -> Void)
-	//@property (nonatomic, copy) void (^didFinishDismissingCompletion)()
-	
+
 	var backgroundView:UIView
 	var containerView:UIView
 
@@ -148,11 +147,11 @@ class KLCPopup:UIView {
 		NSNotificationCenter.defaultCenter().removeObserver(self)
 	}
 	
-	init() {
+	convenience init() {
 		self.init(frame:UIScreen.mainScreen().bounds)
 	}
 	
-	init(frame:CGRect) {
+	override init(frame:CGRect) {
 		super.init(frame:frame)
 		
 		self.userInteractionEnabled = true
@@ -193,11 +192,16 @@ class KLCPopup:UIView {
 			name: UIApplicationDidChangeStatusBarFrameNotification,
 			object: nil)
 	}
+
+	required init?(coder aDecoder: NSCoder) {
+	    fatalError("init(coder:) has not been implemented")
+	}
 	
 	// MARK: - UIView
 	
-	override func hitTest(point:CGPoint, withEvent event:UIEvent) -> UIView {
-		let hitView = super.hitTest(point, withEvent:event)
+	override func hitTest(point:CGPoint, withEvent event:UIEvent?) -> UIView? {
+
+        let hitView = super.hitTest(point, withEvent:event)
 		
 		if hitView == self {
 			// Try to dismiss if backgroundTouch flag set
@@ -213,7 +217,7 @@ class KLCPopup:UIView {
 			}
 		} else {
 			// If view is within containerView and contentTouch flag set, then try to hide.
-			if hitView.isDescendantOfView:(self.containerView) {
+			if hitView!.isDescendantOfView(self.containerView) {
 				if self.shouldDismissOnContentTouch {
 					self.dismiss(true)
 				}
@@ -225,7 +229,7 @@ class KLCPopup:UIView {
 	// MARK: - Class Public
 	
 	class func popup(contentView contentView:UIView) -> KLCPopup {
-		var popup = KLCPopup()
+		let popup = KLCPopup()
 		popup.contentView = contentView
 		return popup
 	}
@@ -237,7 +241,7 @@ class KLCPopup:UIView {
 		dismissOnBackgroundTouch shouldDismissOnBackgroundTouch:Bool,
 		dismissOnContentTouch shouldDismissOnContentTouch:Bool) -> KLCPopup {
 		
-		var popup = KLCPopup()
+		let popup = KLCPopup()
 		popup.contentView = contentView
 		popup.showType = showType
 		popup.dismissType = dismissType
@@ -259,7 +263,7 @@ class KLCPopup:UIView {
 	
 	// MARK: - Public
 	func show() {
-		self.showWithLayout(KLCPopupLayout.Center)
+		self.showWithLayout(KLCPopupLayoutCenter)
 	}
 	
 	func showWithLayout(layout:KLCPopupLayout) {
@@ -267,12 +271,11 @@ class KLCPopup:UIView {
 	}
 	
 	func showWithDuration(duration:NSTimeInterval) {
-		self.showWithLayout(.Center, duration:duration)
+		self.showWithLayout(KLCPopupLayoutCenter, duration:duration)
 	}
 	
 	func showWithLayout(layout:KLCPopupLayout, duration:NSTimeInterval) {
-		let parameters = [	"layout" : NSValue.valueWithKLCPopupLayout(layout),
-							"duration" : duration]
+		let parameters = ["layout" : NSValue.valueWithKLCPopupLayout(layout), "duration" : duration]
 		self.showWithParameters(parameters)
 	}
 	
@@ -281,9 +284,7 @@ class KLCPopup:UIView {
 	}
 	
 	func showAtCenter(center:CGPoint, inView view:UIView, withDuration duration:NSTimeInterval) {
-		let parameters = [ 	"center" : NSValue.valueWithCGPoint(center),
-							"duration" : duration, 
-							"view" : view ]
+		let parameters = ["center" : NSValue.valueWithCGPoint(center),"duration" : duration, "view" : view ]
 		self.showWithParameters(parameters)
 	}
 	
@@ -309,13 +310,14 @@ class KLCPopup:UIView {
 				
 				if animated && self.showType != .None {
 					// Make fade happen faster than motion. Use linear for fades.
-					UIView.animateWithDuration(0.15,delay:0,options:.Linear, animated:backgroundAnimationClosure,completion:nil)
+                    UIView.animateWithDuration(0.15, delay: 0, options: .CurveLinear, animations: self.backgroundAnimationClosure, completion: nil)
 				} else {
 					self.backgroundAnimationClosure()
 				}
 				
 				// Setup completion closure
-				var completion = {
+                var completion:(Bool -> Void) = {
+                    finished in
 					self.removeFromSuperview()
 					self.isBeingShown = false
 					self.isShowing = false
@@ -334,12 +336,12 @@ class KLCPopup:UIView {
 				if animated {
 					switch self.dismissType {
 					case .FadeOut: 
-						UIView.animateWithDuration(0.15, delay:0, options: .Linear, animations:{
+						UIView.animateWithDuration(0.15, delay: 0, options: .CurveLinear, animations:{
 							self.containerView.alpha = 0
-						},completion:completion)
+						}, completion:completion)
 						
 					case .GrowOut:
-						UIView.animateWithDuration(0.15, delay:0, options: kAnimationOptionCurveIOS7, animations: {
+						UIView.animateWithDuration(0.15, delay: 0, options: kAnimationOptionCurveIOS7, animations: {
 							self.containerView.alpha = 0
 							self.containerView.transform = CGAffineTransformMakeScale(1.1, 1.1)
 						}, completion:completion)
@@ -376,62 +378,62 @@ class KLCPopup:UIView {
 							self.containerView.frame = finalFrame
 						}, completion: completion)
 					case .BounceOut:
-						UIView.animateWithDuration(bounce1Duration, delay: 0, options: .EaseOut, animations: {
+						UIView.animateWithDuration(bounce1Duration, delay: 0, options: .CurveEaseOut, animations: {
 							self.containerView.transform = CGAffineTransformMakeScale(1.1, 1.1)
 						}, completion: {
 							finished in
-								UIView.animateWithDuration(bounce2Duration, delay: 0, options: .EaseIn, animations: {
+								UIView.animateWithDuration(bounce2Duration, delay: 0, options: .CurveEaseIn, animations: {
 									self.containerView.alpha = 0/255
 									self.containerView.transform = CGAffineTransformMakeScale(0.1, 0.1)
 								}, completion: completion)
 						})
 					case .BounceOutToTop:
-						UIView.animateWithDuration(bounce1Duration, delay: 0, options: .EaseOut, animations: {
+						UIView.animateWithDuration(bounce1Duration, delay: 0, options: .CurveEaseOut, animations: {
 							var finalFrame = self.containerView.frame
 							finalFrame.origin.y += 40
 							self.containerView.frame = finalFrame
 						}, completion: {
 							finished in
-								UIView.animateWithDuration(bounce2Duration, delay: 0, options: .EaseIn, animations: {
+								UIView.animateWithDuration(bounce2Duration, delay: 0, options: .CurveEaseIn, animations: {
 									var finalFrame = self.containerView.frame
-									finalFrame.origin.y = - CGRectGetHeight(finalFrame)
+									finalFrame.origin.y = -CGRectGetHeight(finalFrame)
 									self.containerView.frame = finalFrame
 								}, completion: completion)
 						})
 					case .BounceOutToBottom:
-						UIView.animateWithDuration(bounce1Duration, delay: 0, options: .EaseOut, animations: {
+						UIView.animateWithDuration(bounce1Duration, delay: 0, options: .CurveEaseOut, animations: {
 							var finalFrame = self.containerView.frame
 							finalFrame.origin.y -= 40
 							self.containerView.frame = finalFrame
 						}, completion: {
 							finished in
-								UIView.animateWithDuration(bounce2Duration, delay: 0, options: .EaseIn, animations: {
+								UIView.animateWithDuration(bounce2Duration, delay: 0, options: .CurveEaseIn, animations: {
 									var finalFrame = self.containerView.frame
 									finalFrame.origin.y = CGRectGetHeight(self.bounds)
 									self.containerView.frame = finalFrame
 								}, completion: completion)
 						})
 					case .BounceOutToLeft:
-						UIView.animateWithDuration(bounce1Duration, delay: 0, options: .EaseOut, animations: {
+						UIView.animateWithDuration(bounce1Duration, delay: 0, options: .CurveEaseOut, animations: {
 							var finalFrame = self.containerView.frame
 							finalFrame.origin.x += 40
 							self.containerView.frame = finalFrame
 						}, completion: {
 							finished in
-								UIView.animateWithDuration(bounce2Duration, delay: 0, options: .EaseIn, animations: {
+								UIView.animateWithDuration(bounce2Duration, delay: 0, options: .CurveEaseIn, animations: {
 									var finalFrame = self.containerView.frame
 									finalFrame.origin.x = -CGRectGetWidth(finalFrame) // self.bounds?
 									self.containerView.frame = finalFrame
 								}, completion: completion)
 						})          
 					case .BounceOutToRight:
-						UIView.animateWithDuration(bounce1Duration, delay: 0, options: .EaseOut, animations: {
+						UIView.animateWithDuration(bounce1Duration, delay: 0, options: .CurveEaseOut, animations: {
 							var finalFrame = self.containerView.frame
 							finalFrame.origin.x -= 40
 							self.containerView.frame = finalFrame
 						}, completion: {
 							finished in
-								UIView.animateWithDuration(bounce2Duration, delay: 0, options: .EaseIn, animations: {
+								UIView.animateWithDuration(bounce2Duration, delay: 0, options: .CurveEaseIn, animations: {
 									var finalFrame = self.containerView.frame
 									finalFrame.origin.x = -CGRectGetWidth(self.bounds) // finalFrame?
 									self.containerView.frame = finalFrame
@@ -464,10 +466,10 @@ class KLCPopup:UIView {
 		dispatch_async(dispatch_get_main_queue()) {
 			// Prepare by adding to the top window
 			if self.superview == nil {
-				let frontToBackWindows = UIApplication.sharedApplication().windows.reverseObjectEnumerator
+				let frontToBackWindows = UIApplication.sharedApplication().windows.reverse()
 				
 				for window in frontToBackWindows {
-					if window.windowLevel == .Normal {
+					if window.windowLevel == UIWindowLevelNormal {
 						window.addSubview(self)
 						break
 					}
@@ -496,7 +498,7 @@ class KLCPopup:UIView {
 			
 			if self.showType != .None {
 				// Make fade happen faster than motion. Use linear for fades.
-				UIView.animateWithDuration(0.15, delay: 0, options: .Linear, animations: {
+				UIView.animateWithDuration(0.15, delay: 0, options: .CurveLinear, animations: {
 					backgroundAnimationClosure()
 				}, completion: nil)
 			} else {
@@ -507,13 +509,13 @@ class KLCPopup:UIView {
 			var duration:NSTimeInterval
 			let durationNumber = parameters.valueForKey("duration")
 			if durationNumber != nil {
-				duration = durationNumber.doubleValue()
+				duration = durationNumber as! Double
 			} else {
 				duration = 0
 			}
 
 			// Setup completion closure
-			var completion = {
+            var completion:(Bool -> Void) = {
 				finished in
 					self.isBeingShown = false
 					self.isShowing = true
@@ -527,7 +529,7 @@ class KLCPopup:UIView {
 					
 					// Set to hide after duration if greater than zero
 					if duration > 0.0 {
-						self.performSelector(Selector("dismiss"), object: nil, afterDelay:duration)
+						self.performSelector(Selector("dismiss"), withObject: nil, afterDelay:duration)
 					}
 			}
 
@@ -568,19 +570,19 @@ class KLCPopup:UIView {
 											)
 
 			// Determine final position and necessary autoresizingMask for container.
-			let finalContainerFrame = containerFrame
-			var containerAutoresizingMask = UIViewAutoresizing.None
+			var finalContainerFrame = containerFrame
+            var containerAutoresizingMask:[UIViewAutoresizing] = UIViewAutoresizing.None
 
 			// Use explicit center coordinates if provided.
 			let centerValue = parameters.valueForKey("center")
 			if centerValue != nil {
-				var centerInView = centerValue.CGPointValue()
+				var centerInView = centerValue as! CGPoint
 				var centerInSelf:CGPoint
 
 				// Convert coordinates from provided view to self. Otherwise use as-is.
-				let fromView = parameters.valueForKey("view")
-				if fromView != nil {
-					centerInSelf = self.convertPoint(centerInView, fromView:fromView)
+				let fromView = parameters.valueForKey("view") as? UIView
+				if let view = fromView {
+					centerInSelf = self.convertPoint(centerInView, fromView:view)
 				} else {
 					centerInSelf = centerInView
 				}
@@ -605,17 +607,17 @@ class KLCPopup:UIView {
 					containerAutoresizingMask.append(.FlexibleRightMargin)
 
 				case .LeftOfCenter:
-					finalContainerFrame.origin.x = floorf(CGRectGetWidth(self.bounds)/3.0 - CGRectGetWidth(containerFrame)/2.0)
+					finalContainerFrame.origin.x = floor(CGRectGetWidth(self.bounds)/3.0 - CGRectGetWidth(containerFrame)/2.0)
 					containerAutoresizingMask.append(.FlexibleLeftMargin)
 					containerAutoresizingMask.append(.FlexibleRightMargin)
 
 				case .Center:
-					finalContainerFrame.origin.x = floorf((CGRectGetWidth(self.bounds) - CGRectGetWidth(containerFrame))/2.0)
+					finalContainerFrame.origin.x = floor((CGRectGetWidth(self.bounds) - CGRectGetWidth(containerFrame))/2.0)
 					containerAutoresizingMask.append(.FlexibleLeftMargin)
 					containerAutoresizingMask.append(.FlexibleRightMargin)
 
 				case .RightOfCenter:
-					finalContainerFrame.origin.x = floorf(CGRectGetWidth(self.bounds)*2.0/3.0 - CGRectGetWidth(containerFrame)/2.0)
+					finalContainerFrame.origin.x = floor(CGRectGetWidth(self.bounds)*2.0/3.0 - CGRectGetWidth(containerFrame)/2.0)
 					containerAutoresizingMask.append(.FlexibleLeftMargin)
 					containerAutoresizingMask.append(.FlexibleRightMargin)
 
@@ -634,17 +636,17 @@ class KLCPopup:UIView {
 					containerAutoresizingMask.append(.FlexibleBottomMargin)
 
 				case .AboveCenter:
-					finalContainerFrame.origin.y = floorf(CGRectGetHeight(self.bounds)/3.0 - CGRectGetHeight(containerFrame)/2.0)
+					finalContainerFrame.origin.y = floor(CGRectGetHeight(self.bounds)/3.0 - CGRectGetHeight(containerFrame)/2.0)
 					containerAutoresizingMask.append(.FlexibleTopMargin)
 					containerAutoresizingMask.append(.FlexibleBottomMargin)
 
 				case .Center:
-					finalContainerFrame.origin.y = floorf((CGRectGetHeight(self.bounds) - CGRectGetHeight(containerFrame))/2.0)
+					finalContainerFrame.origin.y = floor((CGRectGetHeight(self.bounds) - CGRectGetHeight(containerFrame))/2.0)
 					containerAutoresizingMask.append(.FlexibleTopMargin)
 					containerAutoresizingMask.append(.FlexibleBottomMargin)
 
 				case .BelowCenter:
-					finalContainerFrame.origin.y = floorf(CGRectGetHeight(self.bounds)*2.0/3.0 - CGRectGetHeight(containerFrame)/2.0)
+					finalContainerFrame.origin.y = floor(CGRectGetHeight(self.bounds)*2.0/3.0 - CGRectGetHeight(containerFrame)/2.0)
 					containerAutoresizingMask.append(.FlexibleTopMargin)
 					containerAutoresizingMask.append(.FlexibleBottomMargin)
 
@@ -663,11 +665,11 @@ class KLCPopup:UIView {
 			switch self.showType {
 			case .FadeIn:
 				self.containerView.alpha = 0.0
-				self.containerView.transform = CGAffineTransformIdentity()
+				self.containerView.transform = CGAffineTransformIdentity
 				let startFrame = finalContainerFrame
 				self.containerView.frame = startFrame
 
-				UIView.animateWithDuration(0.15, delay: 0, options: .Linear, animations: {
+				UIView.animateWithDuration(0.15, delay: 0, options: .CurveLinear, animations: {
 					self.containerView.alpha = 1
 				}, completion: completion)
 
@@ -681,7 +683,7 @@ class KLCPopup:UIView {
 				UIView.animateWithDuration(0.15, delay: 0, options: kAnimationOptionCurveIOS7, animations: {
 					self.containerView.alpha = 1.0
 					// set transform before frame here...
-					self.containerView.transform = CGAffineTransformIdentity()
+					self.containerView.transform = CGAffineTransformIdentity
 					self.containerView.frame = finalContainerFrame
 				}, completion: completion)
 
@@ -712,7 +714,7 @@ class KLCPopup:UIView {
 
 			case .SlideInFromBottom:
 				self.containerView.alpha = 1.0
-				self.containerView.transform = CGAffineTransformIdentity()
+				self.containerView.transform = CGAffineTransformIdentity
 				var startFrame = finalContainerFrame
 				startFrame.origin.y = CGRectGetHeight(self.bounds)
 				self.containerView.frame = startFrame
@@ -723,7 +725,7 @@ class KLCPopup:UIView {
 
 			case .SlideInFromLeft:
 				self.containerView.alpha = 1.0
-				self.containerView.transform = CGAffineTransformIdentity()
+				self.containerView.transform = CGAffineTransformIdentity
 				var startFrame = finalContainerFrame
 				startFrame.origin.x = -CGRectGetWidth(finalContainerFrame)
 				self.containerView.frame = startFrame
@@ -734,7 +736,7 @@ class KLCPopup:UIView {
 
 			case .SlideInFromRight:
 				self.containerView.alpha = 1.0
-				self.containerView.transform = CGAffineTransformIdentity()
+				self.containerView.transform = CGAffineTransformIdentity
 				var startFrame = finalContainerFrame
 				startFrame.origin.x = CGRectGetWidth(self.bounds)
 				self.containerView.frame = startFrame
@@ -750,14 +752,14 @@ class KLCPopup:UIView {
 				self.containerView.frame = startFrame
 				self.containerView.transform = CGAffineTransformMakeScale(0.1, 0.1)
 
-				UIView.animateWithDuration(0.6, delay:0, usingSpringWithDamping:0.8, initialSpringVelocity:15.0, options:0, animations: {
+				UIView.animateWithDuration(0.6, delay:0, usingSpringWithDamping:0.8, initialSpringVelocity:15.0, options: nil, animations: {
 					self.containerView.alpha = 1.0
-					self.containerView.transform = CGAffineTransformIdentity()
+					self.containerView.transform = CGAffineTransformIdentity
 				}, completion: completion)
 
 			case .BounceInFromTop: 
 				self.containerView.alpha = 1.0
-				self.containerView.transform = CGAffineTransformIdentity()
+				self.containerView.transform = CGAffineTransformIdentity
 				var startFrame = finalContainerFrame
 				startFrame.origin.y = -CGRectGetHeight(finalContainerFrame)
 				self.containerView.frame = startFrame
@@ -768,7 +770,7 @@ class KLCPopup:UIView {
 
 			case .BounceInFromBottom: 
 				self.containerView.alpha = 1.0
-				self.containerView.transform = CGAffineTransformIdentity()
+				self.containerView.transform = CGAffineTransformIdentity
 				var startFrame = finalContainerFrame
 				startFrame.origin.y = CGRectGetHeight(self.bounds)
 				self.containerView.frame = startFrame
@@ -779,7 +781,7 @@ class KLCPopup:UIView {
 
 			case .BounceInFromLeft:
 				self.containerView.alpha = 1.0
-				self.containerView.transform = CGAffineTransformIdentity()
+				self.containerView.transform = CGAffineTransformIdentity
 				var startFrame = finalContainerFrame
 				startFrame.origin.x = -CGRectGetWidth(finalContainerFrame)
 				self.containerView.frame = startFrame
@@ -790,7 +792,7 @@ class KLCPopup:UIView {
 
 			case .BounceInFromRight:
 				self.containerView.alpha = 1.0
-				self.containerView.transform = CGAffineTransformIdentity()
+				self.containerView.transform = CGAffineTransformIdentity
 				var startFrame = finalContainerFrame
 				startFrame.origin.x = CGRectGetWidth(self.bounds)
 				self.containerView.frame = startFrame
@@ -801,7 +803,7 @@ class KLCPopup:UIView {
 
 			default:
 				self.containerView.alpha = 1.0
-				self.containerView.transform = CGAffineTransformIdentity()
+				self.containerView.transform = CGAffineTransformIdentity
 				self.containerView.frame = finalContainerFrame
 				completion(true)
 			}
@@ -831,7 +833,7 @@ class KLCPopup:UIView {
 		//	}
 		//	self.transform = CGAffineTransformMakeRotation(angle)
 		//}
-		self.frame = self.window.bounds
+		self.frame = self.window!.bounds
 	}
 	
 	// Mark: - Notification Handlers
@@ -860,20 +862,20 @@ extension UIView {
 			if subview.isKindOfClass(KLCPopup) {
 				f(subview as! KLCPopup)
 			} else {
-				subview.forEachPopupDoBlock(f)
+				subview.forEachPopupPerformClosure(f)
 			}
 		}
 	}
 	
 	func dismissPresentingPopup() {
 		// Iterate over superviews until you find a KLCPopup and dismiss it
-		let view = self
-		while view != nil {
-			if view.isKindOfClass(KLCPopup) {
-				view.dismiss(true)
+		var aView = self
+		while aView != nil {
+			if aView.isKindOfClass(KLCPopup) {
+				aView.dismiss(true)
 				return
 			}
-			view = view.superview
+			aView = aView.superview
 		}
 	}
 }
